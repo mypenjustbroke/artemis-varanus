@@ -58,7 +58,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg-secondary);color:var(-
 /* ── CARD ── */
 .card{background:var(--card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:40px;max-width:480px;width:100%}
 .card-wide{max-width:640px}
-.card-xl{max-width:780px}
+.card-xl{max-width:860px}
 
 /* ── LOGO ── */
 .logo{width:200px;margin:0 auto 20px}
@@ -706,6 +706,7 @@ function toggleSection(el) {
 function renderResult(r) {
   const c = document.getElementById('resultContent');
   const a = r.analysis || {};
+  const osint = r.osint || { keybase: null, codeSearch: { repoMentions: [], userMatches: [] }, emailIntel: { candidates: [], gravatarMatches: [] }, domains: { resolved: [], checked: [] }, wayback: { avatarHistory: [], usernameHistory: [] }, discordProfile: { bio: null, pronouns: null, topgg: null } };
 
   // Badges HTML
   let badgesHtml = '';
@@ -727,20 +728,31 @@ function renderResult(r) {
   // Created date
   const createdDate = r.accountAge ? new Date(r.accountAge.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown';
 
-  // Cross-platform table rows
-  let xplatRows = '';
+  // Cross-platform table rows — split into found/not found
+  let xplatFoundRows = '';
+  let xplatOtherRows = '';
+  let xplatFoundCount = 0;
   if (r.crossPlatform && r.crossPlatform.length) {
     r.crossPlatform.forEach(p => {
       const statusClass = p.status === 'Found' ? 'xplat-found' : p.status === 'Possible' ? 'xplat-possible' : p.status === 'Error' ? 'xplat-error' : 'xplat-notfound';
       const link = p.url ? `<a href="${esc(p.url)}" target="_blank" class="xplat-link">${esc(p.username)}</a>` : esc(p.username);
-      xplatRows += `<tr>
-        <td>${esc(p.platform)}</td>
-        <td>${link}</td>
+      // Add extra info for rich platforms
+      let extra = '';
+      if (p.bio) extra += ' <span style="color:var(--text-tertiary);font-size:11px">— ' + esc(p.bio.substring(0,50)) + '</span>';
+      if (p.karma) extra += ' <span style="color:var(--text-tertiary);font-size:11px">(karma: ' + p.karma + ')</span>';
+      if (p.repos !== undefined) extra += ' <span style="color:var(--text-tertiary);font-size:11px">(' + p.repos + ' repos)</span>';
+      if (p.followers !== undefined) extra += ' <span style="color:var(--text-tertiary);font-size:11px">(' + p.followers + ' followers)</span>';
+      const row = `<tr>
+        <td><span style="font-size:11px;color:var(--text-tertiary)">${esc(p.category || '')}</span> ${esc(p.platform)}</td>
+        <td>${link}${extra}</td>
         <td class="${statusClass}">${esc(p.status)}</td>
         <td>${esc(p.confidence)}</td>
       </tr>`;
+      if (p.status === 'Found' || p.status === 'Possible') { xplatFoundRows += row; xplatFoundCount++; }
+      else xplatOtherRows += row;
     });
   }
+  const xplatRows = xplatFoundRows + (xplatOtherRows ? `<tr id="xplatToggleRow" style="cursor:pointer" onclick="document.getElementById('xplatHidden').style.display='';this.style.display='none'"><td colspan="4" style="text-align:center;color:var(--blue);font-size:12px;font-weight:500;padding:8px">Show ${r.crossPlatform ? r.crossPlatform.length - xplatFoundCount : 0} unchecked / not found platforms</td></tr><tbody id="xplatHidden" style="display:none">${xplatOtherRows}</tbody>` : '');
 
   const avatarURL = r.avatarURL || 'https://cdn.discordapp.com/embed/avatars/0.png';
 
@@ -914,7 +926,7 @@ function renderResult(r) {
 
     <!-- Cross-Platform Intelligence -->
     <div class="intel-section animate-in">
-      <h3>Cross-Platform Intelligence</h3>
+      <h3>Cross-Platform Intelligence ${xCons.totalChecked ? '<span style="font-size:11px;font-weight:400;color:var(--text-tertiary);text-transform:none;letter-spacing:0">(' + (xCons.totalFound||0) + ' found / ' + xCons.totalChecked + ' checked)</span>' : ''}</h3>
       ${xCons.score !== undefined ? `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
         <span class="tag ${xCons.score >= 60 ? 'tag-green' : xCons.score >= 30 ? 'tag-amber' : 'tag-gray'}">${esc(xCons.level)}</span>
         <span style="font-size:13px;color:var(--text-secondary)">Consistency: ${xCons.score}/100</span>
@@ -924,6 +936,81 @@ function renderResult(r) {
         <tbody>${xplatRows || '<tr><td colspan="4" style="text-align:center;color:var(--text-tertiary)">No cross-platform data</td></tr>'}</tbody>
       </table>
     </div>
+
+    <!-- Keybase Verified Identity -->
+    ${osint.keybase ? `<div class="intel-section animate-in">
+      <h3>Keybase — Verified Identity</h3>
+      <div class="intel-row"><span class="label">Keybase Username</span><span class="value"><a href="https://keybase.io/${esc(osint.keybase.username)}" target="_blank" class="xplat-link">${esc(osint.keybase.username)}</a></span></div>
+      ${osint.keybase.fullName ? `<div class="intel-row"><span class="label">Full Name</span><span class="value" style="font-weight:700">${esc(osint.keybase.fullName)}</span></div>` : ''}
+      ${osint.keybase.bio ? `<div class="intel-row"><span class="label">Bio</span><span class="value" style="font-size:12px;max-width:65%">${esc(osint.keybase.bio)}</span></div>` : ''}
+      ${osint.keybase.location ? `<div class="intel-row"><span class="label">Location</span><span class="value">${esc(osint.keybase.location)}</span></div>` : ''}
+      <div class="intel-row"><span class="label">PGP Keys</span><span class="value">${osint.keybase.pgpKeys || 0}</span></div>
+      ${osint.keybase.proofs && osint.keybase.proofs.length ? `<div style="margin-top:10px"><div class="caption mb-8">Cryptographic Proofs</div>
+        ${osint.keybase.proofs.map(p => `<div class="intel-row"><span class="label">${esc(p.type)}</span><span class="value"><a href="${esc(p.url||'')}" target="_blank" class="xplat-link">${esc(p.username)}</a> <span class="tag tag-green">${esc(p.state === 1 ? 'Verified' : 'Unverified')}</span></span></div>`).join('')}
+      </div>` : ''}
+    </div>` : ''}
+
+    <!-- Discord Profile (Third-Party) -->
+    ${osint.discordProfile && (osint.discordProfile.bio || osint.discordProfile.pronouns || osint.discordProfile.topgg) ? `<div class="analysis-section animate-in">
+      <div class="analysis-header open" onclick="toggleSection(this)"><h3>Discord Profile Intelligence</h3><span class="toggle-icon">&#9660;</span></div>
+      <div class="analysis-body open">
+        ${osint.discordProfile.pronouns ? `<div class="intel-row"><span class="label">Pronouns</span><span class="value">${esc(osint.discordProfile.pronouns)}</span></div>` : ''}
+        ${osint.discordProfile.bio ? `
+          ${osint.discordProfile.bio.description ? `<div class="intel-row"><span class="label">Bio</span><span class="value" style="font-size:12px;max-width:65%">${esc(osint.discordProfile.bio.description)}</span></div>` : ''}
+          ${osint.discordProfile.bio.location ? `<div class="intel-row"><span class="label">Location</span><span class="value">${esc(osint.discordProfile.bio.location)}</span></div>` : ''}
+          ${osint.discordProfile.bio.gender ? `<div class="intel-row"><span class="label">Gender</span><span class="value">${esc(osint.discordProfile.bio.gender)}</span></div>` : ''}
+          ${osint.discordProfile.bio.birthday ? `<div class="intel-row"><span class="label">Birthday</span><span class="value">${esc(osint.discordProfile.bio.birthday)}</span></div>` : ''}
+          ${osint.discordProfile.bio.occupation ? `<div class="intel-row"><span class="label">Occupation</span><span class="value">${esc(osint.discordProfile.bio.occupation)}</span></div>` : ''}
+          ${osint.discordProfile.bio.email ? `<div class="intel-row"><span class="label">Email</span><span class="value" style="font-weight:700;color:var(--blue)">${esc(osint.discordProfile.bio.email)}</span></div>` : ''}
+          ${osint.discordProfile.bio.connectedAccounts && osint.discordProfile.bio.connectedAccounts.length ? `<div style="margin-top:8px"><div class="caption mb-8">Connected Accounts</div>${osint.discordProfile.bio.connectedAccounts.map(ca => `<span class="tag tag-blue">${esc(ca.type || ca.name || JSON.stringify(ca))}</span>`).join('')}</div>` : ''}
+        ` : ''}
+        ${osint.discordProfile.topgg ? `<div style="margin-top:10px"><div class="caption mb-8">Bot Directory (top.gg)</div>
+          <div class="intel-row"><span class="label">Description</span><span class="value" style="font-size:12px;max-width:65%">${esc(osint.discordProfile.topgg.shortdesc)}</span></div>
+          <div class="intel-row"><span class="label">Server Count</span><span class="value">${osint.discordProfile.topgg.serverCount}</span></div>
+          <div class="intel-row"><span class="label">Monthly Votes</span><span class="value">${osint.discordProfile.topgg.monthlyPoints}</span></div>
+          <div class="intel-row"><span class="label">Total Votes</span><span class="value">${osint.discordProfile.topgg.points}</span></div>
+          ${osint.discordProfile.topgg.tags.length ? `<div class="intel-row"><span class="label">Tags</span><span class="value">${osint.discordProfile.topgg.tags.map(t => '<span class="tag tag-blue">'+esc(t)+'</span>').join('')}</span></div>` : ''}
+          ${osint.discordProfile.topgg.website ? `<div class="intel-row"><span class="label">Website</span><span class="value"><a href="${esc(osint.discordProfile.topgg.website)}" target="_blank" class="xplat-link">${esc(osint.discordProfile.topgg.website)}</a></span></div>` : ''}
+        </div>` : ''}
+      </div>
+    </div>` : ''}
+
+    <!-- Email & Domain Intelligence -->
+    ${(osint.emailIntel && osint.emailIntel.gravatarMatches.length > 0) || (osint.domains && osint.domains.resolved.length > 0) ? `<div class="analysis-section animate-in">
+      <div class="analysis-header open" onclick="toggleSection(this)"><h3>Email & Domain Intelligence</h3><span class="toggle-icon">&#9660;</span></div>
+      <div class="analysis-body open">
+        ${osint.emailIntel.gravatarMatches.length > 0 ? `<div class="caption mb-8">Gravatar Matches</div>
+          ${osint.emailIntel.gravatarMatches.map(g => `<div class="intel-row"><span class="label">${esc(g.email)}</span><span class="value"><span class="tag tag-green">Gravatar Found</span></span></div>`).join('')}
+          <div style="height:10px"></div>
+        ` : ''}
+        ${osint.domains.resolved.length > 0 ? `<div class="caption mb-8">Resolved Domains</div>
+          ${osint.domains.resolved.map(d => `<div class="intel-row"><span class="label"><a href="${esc(d.url)}" target="_blank" class="xplat-link">${esc(d.domain)}</a></span><span class="value" style="font-family:monospace;font-size:12px">${esc(d.ips.join(', '))}</span></div>`).join('')}
+        ` : ''}
+        ${osint.domains.checked.length > 0 && osint.domains.resolved.length === 0 ? '<div style="color:var(--text-tertiary);font-size:13px">No domains resolved for ' + osint.domains.checked.join(', ') + '</div>' : ''}
+      </div>
+    </div>` : ''}
+
+    <!-- Code Search & Wayback -->
+    ${(osint.codeSearch && (osint.codeSearch.repoMentions.length > 0 || osint.codeSearch.userMatches.length > 0)) || (osint.wayback && (osint.wayback.avatarHistory.length > 0 || osint.wayback.usernameHistory.length > 0)) ? `<div class="analysis-section animate-in">
+      <div class="analysis-header" onclick="toggleSection(this)"><h3>Code Search & Web Archive</h3><span class="toggle-icon">&#9660;</span></div>
+      <div class="analysis-body">
+        ${osint.codeSearch.repoMentions.length > 0 ? `<div class="caption mb-8">GitHub Repos Mentioning UID</div>
+          ${osint.codeSearch.repoMentions.map(r2 => `<div class="intel-row"><span class="label"><a href="${esc(r2.url)}" target="_blank" class="xplat-link">${esc(r2.name)}</a></span><span class="value" style="font-size:12px">${esc(r2.description||'').substring(0,60)}</span></div>`).join('')}
+          <div style="height:10px"></div>
+        ` : ''}
+        ${osint.codeSearch.userMatches.length > 0 ? `<div class="caption mb-8">GitHub User Matches</div>
+          ${osint.codeSearch.userMatches.map(u => `<div class="intel-row"><span class="label"><a href="${esc(u.url)}" target="_blank" class="xplat-link">${esc(u.login)}</a></span><span class="value"><img src="${esc(u.avatar)}" style="width:20px;height:20px;border-radius:50%;vertical-align:middle" onerror="this.style.display='none'"></span></div>`).join('')}
+          <div style="height:10px"></div>
+        ` : ''}
+        ${osint.wayback.avatarHistory.length > 0 ? `<div class="caption mb-8">Avatar History (Wayback Machine)</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">${osint.wayback.avatarHistory.length} archived snapshot(s)</div>
+          ${osint.wayback.avatarHistory.slice(0,8).map(w => `<div class="intel-row"><span class="label">${esc(w.timestamp)}</span><span class="value"><a href="${esc(w.url)}" target="_blank" class="xplat-link">View</a></span></div>`).join('')}
+        ` : ''}
+        ${osint.wayback.usernameHistory.length > 0 ? `<div style="margin-top:8px"><div class="caption mb-8">Web Archive Mentions</div>
+          ${osint.wayback.usernameHistory.slice(0,8).map(w => `<div class="intel-row"><span class="label" style="font-size:11px;max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.originalUrl)}</span><span class="value">${esc(w.timestamp)}</span></div>`).join('')}
+        </div>` : ''}
+      </div>
+    </div>` : ''}
 
     <!-- Username Intelligence -->
     <div class="analysis-section animate-in">
