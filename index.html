@@ -193,6 +193,53 @@ h3{font-size:15px;font-weight:600;color:var(--text)}
 
 /* ── LOADING SPINNER INLINE ── */
 .spinner-inline{display:inline-block;width:18px;height:18px;border:2px solid var(--border-light);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+
+/* ── RISK SUMMARY BAR ── */
+.risk-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
+.risk-card{padding:16px;border-radius:var(--radius);border:1px solid var(--border-light);text-align:center;background:var(--bg-tertiary)}
+.risk-card .risk-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-tertiary);margin-bottom:6px}
+.risk-card .risk-value{font-size:22px;font-weight:700;line-height:1.2}
+.risk-card .risk-sub{font-size:12px;color:var(--text-secondary);margin-top:4px}
+
+/* ── RISK METER ── */
+.risk-meter{width:100%;height:8px;background:var(--border-light);border-radius:4px;overflow:hidden;margin-top:8px}
+.risk-meter-fill{height:100%;border-radius:4px;transition:width .6s ease}
+
+/* ── ANALYSIS SECTION ── */
+.analysis-section{border:1px solid var(--border-light);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.analysis-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;background:var(--bg-tertiary);user-select:none;transition:background .2s}
+.analysis-header:hover{background:var(--border-light)}
+.analysis-header h3{font-size:13px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin:0}
+.analysis-header .toggle-icon{font-size:12px;color:var(--text-tertiary);transition:transform .2s}
+.analysis-header.open .toggle-icon{transform:rotate(180deg)}
+.analysis-body{padding:14px 16px;border-top:1px solid var(--border-light);display:none}
+.analysis-body.open{display:block}
+
+/* ── ALERT BANNER ── */
+.alert-banner{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:10px;font-size:13px;font-weight:500}
+.alert-banner.alert-danger{background:var(--danger-light);color:var(--danger);border:1px solid #ffcdd2}
+.alert-banner.alert-warning{background:var(--amber-light);color:#e65100;border:1px solid #ffe0b2}
+.alert-banner.alert-info{background:var(--blue-light);color:var(--blue-dark);border:1px solid #bbdefb}
+.alert-banner.alert-success{background:var(--green-light);color:var(--green);border:1px solid #c8e6c9}
+
+/* ── TAG / PILL ── */
+.tag{display:inline-block;padding:2px 8px;font-size:11px;font-weight:600;border-radius:12px;margin:2px 3px 2px 0}
+.tag-red{background:#ffebee;color:#c62828}.tag-orange{background:#fff3e0;color:#e65100}
+.tag-green{background:#e8f5e9;color:#2e7d32}.tag-blue{background:#e3f2fd;color:#1565c0}
+.tag-gray{background:var(--bg-secondary);color:var(--text-tertiary)}.tag-amber{background:#fff8e1;color:#f57f17}
+
+/* ── CONFIDENCE TABLE ── */
+.conf-table{width:100%;border-collapse:collapse;font-size:13px}
+.conf-table th,.conf-table td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--border-light)}
+.conf-table th{color:var(--text-tertiary);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;background:var(--bg-tertiary)}
+.conf-table tr:hover td{background:var(--bg-tertiary)}
+.conf-verified{color:var(--green);font-weight:600}.conf-high{color:#1976d2;font-weight:600}
+.conf-moderate{color:#ef6c00;font-weight:600}.conf-weak{color:var(--text-tertiary)}
+.conf-speculative{color:#9e9e9e;font-style:italic}.conf-na{color:var(--text-tertiary)}
+
+/* ── ALT MATCH ITEM ── */
+.alt-match{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:6px;font-size:13px}
+.alt-match .alt-uid{font-family:'SF Mono',SFMono-Regular,Consolas,monospace;font-size:11px;color:var(--text-tertiary)}
 </style>
 </head>
 <body>
@@ -634,8 +681,31 @@ function newInvestigation() {
 //  RENDER RESULT
 // ═══════════════════════════════════════
 
+function riskColor(level) {
+  const m = {'Critical':'#d32f2f','High':'#e53935','Moderate':'#ef6c00','Low':'#f9a825','Minimal':'#43a047'};
+  return m[level] || '#9e9e9e';
+}
+
+function riskTagClass(level) {
+  const m = {'Critical':'tag-red','High':'tag-red','Moderate':'tag-orange','Low':'tag-amber','Minimal':'tag-green'};
+  return m[level] || 'tag-gray';
+}
+
+function confClass(conf) {
+  const m = {'Verified':'conf-verified','High':'conf-high','Moderate':'conf-moderate','Weak':'conf-weak','Speculative':'conf-speculative'};
+  return m[conf] || 'conf-na';
+}
+
+function toggleSection(el) {
+  const header = el;
+  const body = header.nextElementSibling;
+  header.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
 function renderResult(r) {
   const c = document.getElementById('resultContent');
+  const a = r.analysis || {};
 
   // Badges HTML
   let badgesHtml = '';
@@ -674,6 +744,119 @@ function renderResult(r) {
 
   const avatarURL = r.avatarURL || 'https://cdn.discordapp.com/embed/avatars/0.png';
 
+  // Composite risk
+  const cRisk = a.compositeRisk || {};
+  const cScore = cRisk.score || 0;
+  const cLevel = cRisk.level || 'Unknown';
+  const cColor = riskColor(cLevel);
+
+  // Behavioral profile
+  const bProfile = a.behavioralProfile ? a.behavioralProfile.classification : 'Unknown';
+
+  // Badge credibility
+  const bCred = a.badgeCredibility || {};
+
+  // Alert banners
+  let alertsHtml = '';
+  if (a.impersonation && a.impersonation.flagged) {
+    alertsHtml += `<div class="alert-banner alert-danger">&#9888; <strong>Impersonation Detected:</strong>&nbsp;${esc(a.impersonation.flags.join('; '))}</div>`;
+  }
+  if (a.flagAnomalies && a.flagAnomalies.flagged) {
+    alertsHtml += `<div class="alert-banner alert-warning">&#9888; <strong>Flag Anomalies:</strong>&nbsp;${esc(a.flagAnomalies.anomalies.join('; '))}</div>`;
+  }
+  if (a.botNetworkIndicator && a.botNetworkIndicator.flagged) {
+    alertsHtml += `<div class="alert-banner alert-warning">&#9888; <strong>Bot Network:</strong>&nbsp;${esc(a.botNetworkIndicator.note)}</div>`;
+  }
+  if (a.investigationFrequency && a.investigationFrequency.totalInvestigations >= 3) {
+    alertsHtml += `<div class="alert-banner alert-info">&#128269; <strong>Frequently Investigated:</strong>&nbsp;${a.investigationFrequency.totalInvestigations} prior investigations by ${a.investigationFrequency.uniqueInvestigators} investigator(s)</div>`;
+  }
+
+  // Nitro signals
+  const nitro = a.nitroInference || {};
+  let nitroSignalsHtml = '';
+  if (nitro.signals && nitro.signals.length) {
+    nitroSignalsHtml = nitro.signals.map(s => `<span class="tag tag-blue">${esc(s)}</span>`).join('');
+  }
+
+  // Alt detection
+  const alt = a.altDetection || {};
+  let altHtml = '';
+  if (alt.matches && alt.matches.length) {
+    alt.matches.forEach(m => {
+      altHtml += `<div class="alt-match"><div><strong>${esc(m.username)}</strong> <span class="alt-uid">${esc(m.uid)}</span></div><div class="tag ${m.confidence === 'High' ? 'tag-red' : 'tag-orange'}">${esc(m.confidence)}</div><div style="color:var(--text-secondary);font-size:12px">${esc(m.reason)}</div></div>`;
+    });
+  } else {
+    altHtml = '<div style="color:var(--text-tertiary);font-size:13px;padding:4px 0">No alt account matches found in investigation history</div>';
+  }
+
+  // Creation clustering
+  const cluster = a.creationClustering || {};
+  let clusterHtml = '';
+  if (cluster.matches && cluster.matches.length) {
+    cluster.matches.forEach(m => {
+      clusterHtml += `<div class="alt-match"><div><strong>${esc(m.username)}</strong> <span class="alt-uid">${esc(m.uid)}</span></div><div style="color:var(--text-secondary);font-size:12px">${m.diffMinutes}m apart</div></div>`;
+    });
+  } else {
+    clusterHtml = '<div style="color:var(--text-tertiary);font-size:13px;padding:4px 0">No accounts created within 1 hour of this account</div>';
+  }
+
+  // Bot network
+  const botNet = a.botNetworkIndicator || {};
+  let botNetHtml = '';
+  if (botNet.sequentialIds && botNet.sequentialIds.length) {
+    botNet.sequentialIds.forEach(m => {
+      botNetHtml += `<div class="alt-match"><div><strong>${esc(m.username)}</strong> <span class="alt-uid">${esc(m.uid)}</span></div><div style="color:var(--text-secondary);font-size:12px">ID diff: ${m.idDifference}</div></div>`;
+    });
+  }
+
+  // Username entropy
+  const ent = a.usernameEntropy || {};
+
+  // Name divergence
+  const div = a.nameDivergence || {};
+
+  // Cross-platform consistency
+  const xCons = a.crossPlatformConsistency || {};
+
+  // Age/activity ratio
+  const aar = a.ageActivityRatio || {};
+
+  // Snowflake timing
+  const sft = a.snowflakeTiming || {};
+
+  // Discriminator
+  const disc = a.discriminator || {};
+
+  // Avatar default
+  const avd = a.avatarDefault || {};
+
+  // Platform age correlation
+  const pac = a.platformAgeCorrelation || {};
+  let pacHtml = '';
+  if (pac.platforms && pac.platforms.length > 1) {
+    pac.platforms.forEach(p => {
+      const d = p.created ? new Date(p.created).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : 'N/A';
+      pacHtml += `<div class="intel-row"><span class="label">${esc(p.platform)}</span><span class="value">${esc(d)}</span></div>`;
+    });
+  }
+
+  // Investigation history
+  const invFreq = a.investigationFrequency || {};
+  let invHistHtml = '';
+  if (invFreq.history && invFreq.history.length) {
+    invFreq.history.slice(0, 10).forEach(h => {
+      const d = h.date ? new Date(h.date).toLocaleString() : 'Unknown';
+      invHistHtml += `<div class="intel-row"><span class="label">${esc(h.investigator)}</span><span class="value">${esc(d)}</span></div>`;
+    });
+  }
+
+  // Confidence matrix
+  const cm = a.confidenceMatrix || [];
+  let cmRows = '';
+  cm.forEach(row => {
+    cmRows += `<tr><td>${esc(row.field)}</td><td style="font-weight:500">${esc(row.value)}</td><td class="${confClass(row.confidence)}">${esc(row.confidence)}</td><td style="color:var(--text-tertiary)">${esc(row.source)}</td></tr>`;
+  });
+
   c.innerHTML = `
     <!-- Profile Hero -->
     <div class="profile-hero animate-in">
@@ -684,29 +867,154 @@ function renderResult(r) {
       <div class="mt-8">${badgesHtml}</div>
     </div>
 
+    <!-- Risk Summary -->
+    ${a.compositeRisk ? `<div class="risk-summary animate-in">
+      <div class="risk-card">
+        <div class="risk-label">Risk Score</div>
+        <div class="risk-value" style="color:${cColor}">${cScore}<span style="font-size:14px;color:var(--text-tertiary)">/100</span></div>
+        <div class="risk-meter"><div class="risk-meter-fill" style="width:${cScore}%;background:${cColor}"></div></div>
+        <div class="risk-sub">${esc(cLevel)}</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-label">Profile Type</div>
+        <div class="risk-value" style="font-size:16px;color:var(--text)">${esc(bProfile)}</div>
+        <div class="risk-sub">Behavioral Classification</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-label">Credibility</div>
+        <div class="risk-value" style="font-size:18px;color:${riskColor(bCred.level === 'Very High' ? 'Minimal' : bCred.level === 'High' ? 'Low' : bCred.level === 'Moderate' ? 'Moderate' : 'High')}">${bCred.score || 0}<span style="font-size:13px;color:var(--text-tertiary)"> pts</span></div>
+        <div class="risk-sub">${esc(bCred.level || 'None')} (${bCred.badgeCount || 0} badges)</div>
+      </div>
+    </div>` : ''}
+
+    <!-- Alerts -->
+    ${alertsHtml}
+
     <!-- Account Intelligence -->
     <div class="intel-section animate-in">
       <h3>Account Intelligence</h3>
       <div class="intel-row"><span class="label">Created</span><span class="value">${esc(createdDate)}</span></div>
       <div class="intel-row"><span class="label">Account Age</span><span class="value">${esc(ageText)}</span></div>
       <div class="intel-row"><span class="label">Age Risk</span><span class="value ${riskClass}">${esc(r.accountAge ? r.accountAge.risk : 'Unknown')}</span></div>
-      <div class="intel-row"><span class="label">Nitro (Inferred)</span><span class="value">${r.avatar && r.avatar.nitroInferred ? 'Likely' : 'Not detected'}</span></div>
+      <div class="intel-row"><span class="label">Nitro Status</span><span class="value">${esc(nitro.likelihood || 'Not detected')}</span></div>
+      ${nitroSignalsHtml ? `<div class="intel-row"><span class="label">Nitro Signals</span><span class="value">${nitroSignalsHtml}</span></div>` : ''}
+      <div class="intel-row"><span class="label">Custom Avatar</span><span class="value">${r.avatar && r.avatar.hasCustomAvatar ? 'Yes' : '<span style="color:var(--text-tertiary)">Default</span>'}</span></div>
       <div class="intel-row"><span class="label">Animated Avatar</span><span class="value">${r.avatar && r.avatar.isAnimated ? 'Yes' : 'No'}</span></div>
-      <div class="intel-row"><span class="label">Custom Avatar</span><span class="value">${r.avatar && r.avatar.hasCustomAvatar ? 'Yes' : 'Default'}</span></div>
       <div class="intel-row"><span class="label">Custom Banner</span><span class="value">${r.avatar && r.avatar.hasCustomBanner ? 'Yes' : 'No'}</span></div>
       <div class="intel-row"><span class="label">Bot Account</span><span class="value">${r.isBot ? '<span style="color:var(--danger);font-weight:700">Yes</span>' : 'No'}</span></div>
       <div class="intel-row"><span class="label">System Account</span><span class="value">${r.isSystem ? 'Yes' : 'No'}</span></div>
+      <div class="intel-row"><span class="label">Discriminator</span><span class="value" style="font-family:monospace">#${esc(disc.value || '0')}</span></div>
+      <div class="intel-row"><span class="label">Discriminator Note</span><span class="value" style="font-size:12px">${esc(disc.analysis || '')}</span></div>
       <div class="intel-row"><span class="label">Public Flags</span><span class="value" style="font-family:monospace">${r.flags || 0}</span></div>
+      ${sft.utcHour !== undefined ? `
+        <div class="intel-row"><span class="label">Created (UTC)</span><span class="value">${esc(sft.utcDay)} ${esc(sft.timeOfDay)} (${sft.utcHour}:00 UTC)</span></div>
+        ${sft.unusual ? `<div class="intel-row"><span class="label">Timing Flag</span><span class="value" style="color:var(--orange)">${esc(sft.note)}</span></div>` : ''}
+      ` : ''}
     </div>
 
     <!-- Cross-Platform Intelligence -->
     <div class="intel-section animate-in">
       <h3>Cross-Platform Intelligence</h3>
+      ${xCons.score !== undefined ? `<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <span class="tag ${xCons.score >= 60 ? 'tag-green' : xCons.score >= 30 ? 'tag-amber' : 'tag-gray'}">${esc(xCons.level)}</span>
+        <span style="font-size:13px;color:var(--text-secondary)">Consistency: ${xCons.score}/100</span>
+      </div>` : ''}
       <table class="xplat-table">
         <thead><tr><th>Platform</th><th>Username</th><th>Status</th><th>Confidence</th></tr></thead>
         <tbody>${xplatRows || '<tr><td colspan="4" style="text-align:center;color:var(--text-tertiary)">No cross-platform data</td></tr>'}</tbody>
       </table>
     </div>
+
+    <!-- Username Intelligence -->
+    <div class="analysis-section animate-in">
+      <div class="analysis-header" onclick="toggleSection(this)"><h3>Username Intelligence</h3><span class="toggle-icon">&#9660;</span></div>
+      <div class="analysis-body">
+        <div class="intel-row"><span class="label">Username</span><span class="value" style="font-family:monospace">${esc(ent.length ? r.username : '')}</span></div>
+        <div class="intel-row"><span class="label">Length</span><span class="value">${ent.length || 0} chars</span></div>
+        <div class="intel-row"><span class="label">Entropy</span><span class="value">${ent.entropy || 0} bits</span></div>
+        <div class="intel-row"><span class="label">Normalized Entropy</span><span class="value">${ent.normalized || 0}</span></div>
+        <div class="intel-row"><span class="label">Assessment</span><span class="value" style="font-size:12px">${esc(ent.level || '')}</span></div>
+        <div style="height:8px"></div>
+        <div class="intel-row"><span class="label">Display Name</span><span class="value">${esc(div.displayName || 'Not set')}</span></div>
+        <div class="intel-row"><span class="label">Name Divergence</span><span class="value">${esc(div.level || 'N/A')}</span></div>
+        ${div.distance > 0 ? `<div class="intel-row"><span class="label">Levenshtein Distance</span><span class="value">${div.distance}</span></div>` : ''}
+      </div>
+    </div>
+
+    <!-- Threat Assessment -->
+    <div class="analysis-section animate-in">
+      <div class="analysis-header${a.impersonation && a.impersonation.flagged || a.flagAnomalies && a.flagAnomalies.flagged ? ' open' : ''}" onclick="toggleSection(this)">
+        <h3>Threat Assessment</h3><span class="toggle-icon">&#9660;</span>
+      </div>
+      <div class="analysis-body${a.impersonation && a.impersonation.flagged || a.flagAnomalies && a.flagAnomalies.flagged ? ' open' : ''}">
+        <div class="caption mb-8">Impersonation Detection</div>
+        ${a.impersonation && a.impersonation.flagged
+          ? a.impersonation.flags.map(f => `<div style="color:var(--danger);font-size:13px;padding:3px 0">&#9888; ${esc(f)}</div>`).join('')
+          : '<div style="color:var(--green);font-size:13px;padding:3px 0">&#10003; No impersonation indicators</div>'
+        }
+        <div style="height:12px"></div>
+        <div class="caption mb-8">Flag Anomalies</div>
+        ${a.flagAnomalies && a.flagAnomalies.flagged
+          ? a.flagAnomalies.anomalies.map(f => `<div style="color:var(--orange);font-size:13px;padding:3px 0">&#9888; ${esc(f)}</div>`).join('')
+          : '<div style="color:var(--green);font-size:13px;padding:3px 0">&#10003; No flag anomalies detected</div>'
+        }
+        <div style="height:12px"></div>
+        <div class="caption mb-8">Avatar Status</div>
+        <div style="font-size:13px;color:var(--text-secondary)">${esc(avd.note || '')}</div>
+      </div>
+    </div>
+
+    <!-- Alt Detection & Network -->
+    <div class="analysis-section animate-in">
+      <div class="analysis-header${alt.count > 0 ? ' open' : ''}" onclick="toggleSection(this)">
+        <h3>Alt Detection & Network Analysis ${alt.count > 0 ? '<span class="tag tag-red" style="margin-left:8px">' + alt.count + ' match(es)</span>' : ''}</h3>
+        <span class="toggle-icon">&#9660;</span>
+      </div>
+      <div class="analysis-body${alt.count > 0 ? ' open' : ''}">
+        <div class="caption mb-8">Alt Account Matches</div>
+        ${altHtml}
+        <div style="height:12px"></div>
+        <div class="caption mb-8">Creation Clustering</div>
+        ${clusterHtml}
+        ${botNet.flagged ? `<div style="height:12px"></div><div class="caption mb-8">Sequential ID Detection</div>${botNetHtml}` : ''}
+      </div>
+    </div>
+
+    <!-- Account Activity Profile -->
+    <div class="analysis-section animate-in">
+      <div class="analysis-header" onclick="toggleSection(this)"><h3>Account Activity Profile</h3><span class="toggle-icon">&#9660;</span></div>
+      <div class="analysis-body">
+        <div class="intel-row"><span class="label">Activity Points</span><span class="value">${aar.activityPoints || 0}</span></div>
+        <div class="intel-row"><span class="label">Activity Ratio</span><span class="value">${aar.ratio || 0}</span></div>
+        <div class="intel-row"><span class="label">Assessment</span><span class="value" style="font-size:12px">${esc(aar.assessment || '')}</span></div>
+        ${pacHtml ? `<div style="height:12px"></div><div class="caption mb-8">Platform Age Correlation</div>${pacHtml}<div style="font-size:12px;color:var(--text-secondary);margin-top:6px">${esc(pac.assessment || '')}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- Investigation History -->
+    <div class="analysis-section animate-in">
+      <div class="analysis-header" onclick="toggleSection(this)">
+        <h3>Investigation History ${invFreq.totalInvestigations > 0 ? '<span class="tag tag-blue" style="margin-left:8px">' + invFreq.totalInvestigations + ' prior</span>' : ''}</h3>
+        <span class="toggle-icon">&#9660;</span>
+      </div>
+      <div class="analysis-body">
+        <div class="intel-row"><span class="label">Total Investigations</span><span class="value">${invFreq.totalInvestigations || 0}</span></div>
+        <div class="intel-row"><span class="label">Unique Investigators</span><span class="value">${invFreq.uniqueInvestigators || 0}</span></div>
+        <div class="intel-row"><span class="label">Status</span><span class="value">${esc(invFreq.level || 'First investigation')}</span></div>
+        ${invHistHtml ? `<div style="height:8px"></div><div class="caption mb-8">History</div>${invHistHtml}` : ''}
+      </div>
+    </div>
+
+    <!-- Confidence Matrix -->
+    ${cm.length ? `<div class="analysis-section animate-in">
+      <div class="analysis-header" onclick="toggleSection(this)"><h3>Confidence Matrix</h3><span class="toggle-icon">&#9660;</span></div>
+      <div class="analysis-body">
+        <table class="conf-table">
+          <thead><tr><th>Field</th><th>Value</th><th>Confidence</th><th>Source</th></tr></thead>
+          <tbody>${cmRows}</tbody>
+        </table>
+      </div>
+    </div>` : ''}
 
     <!-- Investigation Metadata -->
     <div class="intel-section animate-in">
@@ -726,6 +1034,7 @@ function renderResult(r) {
 function exportReport() {
   if (!currentResult) return;
   const r = currentResult;
+  const a = r.analysis || {};
 
   const printWin = window.open('', '_blank');
   if (!printWin) { alert('Pop-up blocked. Please allow pop-ups for this site.'); return; }
@@ -743,6 +1052,36 @@ function exportReport() {
     xplatHtml += '</tbody></table>';
   }
 
+  // Composite risk
+  const cRisk = a.compositeRisk || {};
+  const bProfile = a.behavioralProfile ? a.behavioralProfile.classification : 'Unknown';
+  const bCred = a.badgeCredibility || {};
+  const nitro = a.nitroInference || {};
+  const ent = a.usernameEntropy || {};
+  const divg = a.nameDivergence || {};
+  const aar = a.ageActivityRatio || {};
+  const invFreq = a.investigationFrequency || {};
+
+  // Confidence matrix table
+  const cm = a.confidenceMatrix || [];
+  let cmHtml = '';
+  if (cm.length) {
+    cmHtml = '<table style="width:100%;border-collapse:collapse;margin:8px 0;font-size:12px"><thead><tr><th style="text-align:left;padding:5px;border-bottom:2px solid #1976d2">Field</th><th style="text-align:left;padding:5px;border-bottom:2px solid #1976d2">Value</th><th style="text-align:left;padding:5px;border-bottom:2px solid #1976d2">Confidence</th><th style="text-align:left;padding:5px;border-bottom:2px solid #1976d2">Source</th></tr></thead><tbody>';
+    cm.forEach(row => {
+      cmHtml += `<tr><td style="padding:3px 5px;border-bottom:1px solid #eee">${esc(row.field)}</td><td style="padding:3px 5px;border-bottom:1px solid #eee;font-weight:500">${esc(row.value)}</td><td style="padding:3px 5px;border-bottom:1px solid #eee">${esc(row.confidence)}</td><td style="padding:3px 5px;border-bottom:1px solid #eee;color:#86868b">${esc(row.source)}</td></tr>`;
+    });
+    cmHtml += '</tbody></table>';
+  }
+
+  // Alt matches
+  const alt = a.altDetection || {};
+  let altText = '';
+  if (alt.matches && alt.matches.length) {
+    alt.matches.forEach(m => { altText += `<div class="row"><span class="l">${esc(m.username)} (${esc(m.uid)})</span><span class="v">${esc(m.reason)} — ${esc(m.confidence)}</span></div>`; });
+  } else {
+    altText = '<p style="color:#86868b;font-size:13px">No alt account matches found</p>';
+  }
+
   printWin.document.write(`<!DOCTYPE html><html><head><title>Artemis Report — ${esc(r.username)}</title><style>
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:700px;margin:40px auto;color:#1d1d1f;font-size:14px;line-height:1.6}
     h1{font-size:22px;color:#1976d2;margin-bottom:4px}
@@ -750,21 +1089,51 @@ function exportReport() {
     .row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0}
     .row .l{color:#6e6e73}.row .v{font-weight:600}
     .meta{font-size:12px;color:#86868b;margin-top:24px;border-top:1px solid #e8e8ed;padding-top:12px}
+    .risk-box{display:inline-block;padding:8px 16px;border-radius:8px;font-weight:700;font-size:18px;margin:8px 4px}
+    .alert{padding:8px 12px;border-radius:6px;font-size:13px;margin:4px 0}
+    .alert-red{background:#ffebee;color:#c62828}.alert-orange{background:#fff3e0;color:#e65100}
+    @media print{body{margin:20px}}
   </style></head><body>
     <h1>Artemis Intelligence Report</h1>
     <p style="color:#6e6e73;margin-bottom:20px">Arrephoros Technologies PLC &middot; Generated ${new Date().toLocaleString()}</p>
     <div style="text-align:center;margin:20px 0"><img src="${esc(r.avatarURL || '')}" style="width:80px;height:80px;border-radius:50%;border:3px solid #1976d2" onerror="this.style.display='none'"></div>
     <div style="text-align:center"><strong style="font-size:18px">${esc(r.username)}</strong><br><span style="color:#6e6e73">${esc(r.displayName)}</span><br><code style="font-size:12px;color:#86868b">${esc(r.uid)}</code></div>
+
+    <h2>Risk Summary</h2>
+    <div style="display:flex;gap:16px;justify-content:center;margin:12px 0">
+      <div class="risk-box" style="background:${riskColor(cRisk.level || 'Unknown')}22;color:${riskColor(cRisk.level || 'Unknown')};border:2px solid ${riskColor(cRisk.level || 'Unknown')}">${cRisk.score || 0}/100 ${esc(cRisk.level || '')}</div>
+      <div class="risk-box" style="background:#e3f2fd;color:#1565c0;border:2px solid #1976d2">${esc(bProfile)}</div>
+    </div>
+    ${a.impersonation && a.impersonation.flagged ? `<div class="alert alert-red">&#9888; Impersonation: ${esc(a.impersonation.flags.join('; '))}</div>` : ''}
+    ${a.flagAnomalies && a.flagAnomalies.flagged ? `<div class="alert alert-orange">&#9888; Flag Anomalies: ${esc(a.flagAnomalies.anomalies.join('; '))}</div>` : ''}
+
     <h2>Account Intelligence</h2>
     <div class="row"><span class="l">Created</span><span class="v">${esc(createdDate)}</span></div>
     <div class="row"><span class="l">Account Age</span><span class="v">${ageDays} days</span></div>
     <div class="row"><span class="l">Age Risk</span><span class="v" style="color:${r.accountAge ? r.accountAge.color : '#000'}">${esc(r.accountAge ? r.accountAge.risk : 'Unknown')}</span></div>
     <div class="row"><span class="l">Badges</span><span class="v">${esc(badgesText)}</span></div>
+    <div class="row"><span class="l">Badge Credibility</span><span class="v">${bCred.score || 0} pts (${esc(bCred.level || 'None')})</span></div>
     <div class="row"><span class="l">Bot Account</span><span class="v">${r.isBot ? 'Yes' : 'No'}</span></div>
-    <div class="row"><span class="l">Nitro (Inferred)</span><span class="v">${r.avatar && r.avatar.nitroInferred ? 'Likely' : 'Not detected'}</span></div>
+    <div class="row"><span class="l">Nitro Status</span><span class="v">${esc(nitro.likelihood || 'Not detected')}${nitro.signals && nitro.signals.length ? ' — ' + esc(nitro.signals.join(', ')) : ''}</span></div>
     <div class="row"><span class="l">Public Flags</span><span class="v">${r.flags || 0}</span></div>
+
+    <h2>Username Intelligence</h2>
+    <div class="row"><span class="l">Entropy</span><span class="v">${ent.entropy || 0} bits (${esc(ent.level || '')})</span></div>
+    <div class="row"><span class="l">Name Divergence</span><span class="v">${esc(divg.level || 'N/A')}</span></div>
+    <div class="row"><span class="l">Activity Assessment</span><span class="v">${esc(aar.assessment || '')}</span></div>
+
     <h2>Cross-Platform Intelligence</h2>
     ${xplatHtml || '<p style="color:#86868b">No cross-platform data available.</p>'}
+
+    <h2>Alt Detection</h2>
+    ${altText}
+
+    <h2>Investigation History</h2>
+    <div class="row"><span class="l">Prior Investigations</span><span class="v">${invFreq.totalInvestigations || 0} (${invFreq.uniqueInvestigators || 0} investigators)</span></div>
+    <div class="row"><span class="l">Status</span><span class="v">${esc(invFreq.level || 'First investigation')}</span></div>
+
+    ${cmHtml ? '<h2>Confidence Matrix</h2>' + cmHtml : ''}
+
     <div class="meta">
       <div class="row"><span class="l">Investigation ID</span><span class="v">${esc(r.investigationId)}</span></div>
       <div class="row"><span class="l">Investigator</span><span class="v">${esc(r.investigator)}</span></div>
