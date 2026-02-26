@@ -749,10 +749,14 @@ function renderResult(r) {
       const link = p.url ? `<a href="${esc(p.url)}" target="_blank" class="xplat-link">${esc(p.username)}</a>` : esc(p.username);
       // Add extra info for rich platforms
       let extra = '';
+      if (p.displayName && p.displayName !== p.username) extra += ' <span style="color:var(--text-secondary);font-size:11px;font-weight:600">' + esc(p.displayName) + '</span>';
+      if (p.realName) extra += ' <span style="color:var(--text-secondary);font-size:11px;font-weight:600">' + esc(p.realName) + '</span>';
+      if (p.location) extra += ' <span style="color:var(--text-tertiary);font-size:11px">&#128205;' + esc(p.location) + '</span>';
       if (p.bio) extra += ' <span style="color:var(--text-tertiary);font-size:11px">— ' + esc(p.bio.substring(0,50)) + '</span>';
       if (p.karma) extra += ' <span style="color:var(--text-tertiary);font-size:11px">(karma: ' + p.karma + ')</span>';
       if (p.repos !== undefined) extra += ' <span style="color:var(--text-tertiary);font-size:11px">(' + p.repos + ' repos)</span>';
       if (p.followers !== undefined) extra += ' <span style="color:var(--text-tertiary);font-size:11px">(' + p.followers + ' followers)</span>';
+      if (p.links && p.links.length) extra += ' <span style="color:var(--blue);font-size:11px">(' + p.links.length + ' links)</span>';
       const row = `<tr>
         <td><span style="font-size:11px;color:var(--text-tertiary)">${esc(p.category || '')}</span> ${esc(p.platform)}</td>
         <td>${link}${extra}</td>
@@ -1012,11 +1016,21 @@ function renderResult(r) {
     </div>` : ''}
 
     <!-- Email & Domain Intelligence -->
-    ${(osint.emailIntel && osint.emailIntel.gravatarMatches.length > 0) || (osint.domains && osint.domains.resolved.length > 0) ? `<div class="analysis-section animate-in">
+    ${(osint.emailIntel && (osint.emailIntel.gravatarMatches.length > 0 || (osint.emailIntel.gravatarProfiles && osint.emailIntel.gravatarProfiles.length > 0))) || (osint.domains && osint.domains.resolved.length > 0) ? `<div class="analysis-section animate-in">
       <div class="analysis-header open" onclick="toggleSection(this)"><h3>Email & Domain Intelligence</h3><span class="toggle-icon">&#9660;</span></div>
       <div class="analysis-body open">
         ${osint.emailIntel.gravatarMatches.length > 0 ? `<div class="caption mb-8">Gravatar Matches</div>
-          ${osint.emailIntel.gravatarMatches.map(g => `<div class="intel-row"><span class="label">${esc(g.email)}</span><span class="value"><span class="tag tag-green">Gravatar Found</span></span></div>`).join('')}
+          ${osint.emailIntel.gravatarMatches.map(g => `<div class="intel-row"><span class="label">${esc(g.email)}</span><span class="value"><span class="tag tag-green">Gravatar Found</span>${g.source ? ' <span class="tag tag-blue">via ' + esc(g.source) + '</span>' : ''}</span></div>`).join('')}
+          <div style="height:10px"></div>
+        ` : ''}
+        ${osint.emailIntel.gravatarProfiles && osint.emailIntel.gravatarProfiles.length > 0 ? `<div class="caption mb-8">Gravatar Profile Data</div>
+          ${osint.emailIntel.gravatarProfiles.map(gp => `
+            ${gp.name ? `<div class="intel-row"><span class="label">Name</span><span class="value" style="font-weight:700">${esc(gp.name)}</span></div>` : ''}
+            ${gp.displayName ? `<div class="intel-row"><span class="label">Display Name</span><span class="value">${esc(gp.displayName)}</span></div>` : ''}
+            ${gp.currentLocation ? `<div class="intel-row"><span class="label">Location</span><span class="value">${esc(gp.currentLocation)}</span></div>` : ''}
+            ${gp.aboutMe ? `<div class="intel-row"><span class="label">About</span><span class="value" style="font-size:12px;max-width:65%">${esc(gp.aboutMe.substring(0,200))}</span></div>` : ''}
+            ${gp.urls && gp.urls.length ? gp.urls.map(u => `<div class="intel-row"><span class="label">${esc(u.title || 'Link')}</span><span class="value"><a href="${esc(u.value)}" target="_blank" class="xplat-link">${esc(u.value.substring(0,60))}</a></span></div>`).join('') : ''}
+          `).join('<div style="height:8px;border-bottom:1px solid var(--border-light);margin:6px 0"></div>')}
           <div style="height:10px"></div>
         ` : ''}
         ${osint.domains.resolved.length > 0 ? `<div class="caption mb-8">Resolved Domains</div>
