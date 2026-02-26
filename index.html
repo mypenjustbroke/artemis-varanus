@@ -1,0 +1,836 @@
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  ARTEMIS — Discord Intelligence Platform                     ║
+  ║  Arrephoros Technologies                                     ║
+  ║  Version One: Varanus                                        ║
+  ╠══════════════════════════════════════════════════════════════╣
+  ║                                                              ║
+  ║  SETUP:                                                      ║
+  ║  1. Go to Discord Developer Portal → New Application         ║
+  ║     → Bot tab → copy token                                   ║
+  ║  2. In the Apollo Google Sheet → Extensions → Apps Script     ║
+  ║  3. Project Settings → Script Properties →                   ║
+  ║     add DISCORD_BOT_TOKEN with your bot token                ║
+  ║  4. Add Artemis-Backend.gs as a new file in the project      ║
+  ║  5. In Apollo-Backend.gs, add 4 new cases to doPost()        ║
+  ║  6. Deploy → Manage deployments → New version → Deploy       ║
+  ║  7. Copy the deployment URL into API_URL below               ║
+  ║  8. Host this file (GitHub Pages, etc.) and embed            ║
+  ║                                                              ║
+  ║  DEFAULT ADMIN (auto-seeded on first server request):        ║
+  ║  Username: SYSADMIN   Password: arrephoros                   ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artemis — Discord Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg-secondary:#f5f5f7;--bg-tertiary:#fafafa;
+  --card:#ffffff;--card-hover:#fafafa;
+  --blue:#1976d2;--blue-light:#e3f2fd;--blue-dark:#1565c0;
+  --green:#43a047;--green-light:#e8f5e9;
+  --amber:#f9a825;--amber-light:#fff8e1;
+  --orange:#ef6c00;--orange-light:#fff3e0;
+  --red:#e53935;--red-light:#ffebee;
+  --danger:#d32f2f;--danger-light:#ffebee;
+  --text:#1d1d1f;--text-secondary:#6e6e73;--text-tertiary:#86868b;
+  --border:#d2d2d7;--border-light:#e8e8ed;
+  --font:'Inter',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --radius:12px;--radius-sm:8px;--radius-lg:16px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.06);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.1),0 4px 12px rgba(0,0,0,.06);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg-secondary);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+
+/* ── SCREENS ── */
+.screen{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
+.screen.active{display:flex}
+
+/* ── CARD ── */
+.card{background:var(--card);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:40px;max-width:480px;width:100%}
+.card-wide{max-width:640px}
+.card-xl{max-width:780px}
+
+/* ── LOGO ── */
+.logo{width:200px;margin:0 auto 20px}
+.logo svg{width:100%;height:auto}
+.logo-icon{width:40px;height:40px}
+.logo-icon svg{width:100%;height:100%}
+
+/* ── TYPOGRAPHY ── */
+h1{font-size:28px;font-weight:700;letter-spacing:-.02em;color:var(--text)}
+h2{font-size:20px;font-weight:600;letter-spacing:-.01em;color:var(--text)}
+h3{font-size:15px;font-weight:600;color:var(--text)}
+.subtitle{font-size:14px;color:var(--text-secondary);font-weight:400;margin-top:4px}
+.caption{font-size:12px;color:var(--text-tertiary);font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+.version-tag{display:inline-block;font-size:11px;font-weight:600;color:var(--text-tertiary);background:var(--bg-secondary);border-radius:6px;padding:2px 8px;letter-spacing:.04em;text-transform:uppercase;margin-top:8px}
+
+/* ── FORM ── */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;background:var(--bg-secondary);border:1px solid var(--border-light);color:var(--text);padding:11px 14px;font-family:var(--font);font-size:15px;border-radius:var(--radius-sm);outline:none;transition:border-color .2s,box-shadow .2s}
+.field input:focus,.field select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(25,118,210,.12)}
+.field input::placeholder{color:var(--text-tertiary)}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:11px 24px;font-family:var(--font);font-size:14px;font-weight:600;border:none;border-radius:var(--radius-sm);cursor:pointer;transition:all .2s;gap:6px}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:var(--blue-dark);box-shadow:var(--shadow-md)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{background:var(--bg-secondary);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--border-light)}
+.btn-danger{background:var(--danger-light);color:var(--danger);border:1px solid transparent}
+.btn-danger:hover{background:var(--danger);color:#fff}
+.btn-sm{padding:7px 14px;font-size:13px;border-radius:6px}
+.btn-full{width:100%}
+.btn-ghost{background:transparent;color:var(--text-secondary);padding:7px 12px}
+.btn-ghost:hover{background:var(--bg-secondary);color:var(--text)}
+
+/* ── TABLE ── */
+.user-table{width:100%;border-collapse:collapse;margin:12px 0}
+.user-table th,.user-table td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--border-light);font-size:14px}
+.user-table th{color:var(--text-tertiary);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.user-table tr:hover td{background:var(--bg-tertiary)}
+
+/* ── BADGE ── */
+.badge{display:inline-block;padding:3px 10px;font-size:12px;font-weight:600;border-radius:20px}
+.badge-active{background:var(--green-light);color:var(--green)}
+.badge-discord{display:inline-block;padding:3px 10px;font-size:11px;font-weight:600;border-radius:20px;background:var(--blue-light);color:var(--blue);margin:2px 4px 2px 0}
+
+/* ── LOADING ── */
+#loadingOverlay{position:fixed;inset:0;z-index:10000;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
+#loadingOverlay.fade-out{opacity:0;pointer-events:none}
+.loader-ring{width:40px;height:40px;border:3px solid var(--border-light);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--text-tertiary)}
+
+/* ── SECTION DIVIDER ── */
+.divider{height:1px;background:var(--border-light);margin:20px 0}
+
+/* ── HELPERS ── */
+.mt-4{margin-top:4px}.mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}.mt-20{margin-top:20px}.mt-24{margin-top:24px}
+.mb-4{margin-bottom:4px}.mb-8{margin-bottom:8px}.mb-12{margin-bottom:12px}.mb-16{margin-bottom:16px}
+.text-center{text-align:center}
+.text-blue{color:var(--blue)}.text-secondary{color:var(--text-secondary)}
+.flex-row{display:flex;gap:8px;align-items:center}
+.error-msg{color:var(--danger);font-size:13px;font-weight:500;min-height:20px;margin-top:8px}
+
+/* ── ANIMATE ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:fadeUp .4s ease forwards}
+
+/* ── PANEL SECTION ── */
+.panel-section{padding:20px;border:1px solid var(--border-light);border-radius:var(--radius);margin-bottom:16px}
+
+/* ── COMPANY WATERMARK ── */
+.company-watermark{position:fixed;bottom:16px;right:20px;z-index:9998;opacity:.5;pointer-events:none}
+.company-watermark img{height:32px;display:block;mix-blend-mode:multiply}
+
+/* ── SEARCH CONTAINER ── */
+.search-container{display:flex;gap:10px;margin-bottom:24px}
+.search-container input{flex:1;background:var(--bg-secondary);border:1px solid var(--border-light);color:var(--text);padding:12px 16px;font-family:var(--font);font-size:15px;border-radius:var(--radius-sm);outline:none;transition:border-color .2s,box-shadow .2s}
+.search-container input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(25,118,210,.12)}
+.search-container input::placeholder{color:var(--text-tertiary)}
+
+/* ── PROFILE HERO ── */
+.profile-hero{text-align:center;padding:24px;margin-bottom:20px;border:1px solid var(--border-light);border-radius:var(--radius);background:var(--bg-tertiary)}
+.profile-avatar{width:96px;height:96px;border-radius:50%;border:3px solid var(--blue);object-fit:cover;margin-bottom:12px}
+.profile-username{font-size:20px;font-weight:700;color:var(--text)}
+.profile-displayname{font-size:14px;color:var(--text-secondary);margin-top:2px}
+.profile-uid{font-family:'SF Mono',SFMono-Regular,Consolas,'Liberation Mono',Menlo,monospace;font-size:12px;color:var(--text-tertiary);margin-top:6px;background:var(--bg-secondary);display:inline-block;padding:2px 10px;border-radius:4px}
+
+/* ── INTEL SECTIONS ── */
+.intel-section{padding:16px 20px;border:1px solid var(--border-light);border-radius:var(--radius);margin-bottom:12px}
+.intel-section h3{font-size:13px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.intel-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:14px}
+.intel-row:last-child{border-bottom:none}
+.intel-row .label{color:var(--text-secondary)}
+.intel-row .value{font-weight:600;color:var(--text);text-align:right;max-width:60%}
+
+/* ── CROSS-PLATFORM TABLE ── */
+.xplat-table{width:100%;border-collapse:collapse;font-size:13px}
+.xplat-table th,.xplat-table td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--border-light)}
+.xplat-table th{color:var(--text-tertiary);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.xplat-table tr:hover td{background:var(--bg-tertiary)}
+.xplat-found{color:var(--green);font-weight:600}
+.xplat-notfound{color:var(--text-tertiary)}
+.xplat-possible{color:var(--amber);font-weight:600}
+.xplat-error{color:var(--danger)}
+.xplat-link{color:var(--blue);text-decoration:none;font-weight:500}
+.xplat-link:hover{text-decoration:underline}
+
+/* ── INVESTIGATION LIST ITEMS ── */
+.inv-item{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--border-light);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;transition:all .2s}
+.inv-item:hover{background:var(--bg-tertiary);border-color:var(--border);box-shadow:var(--shadow)}
+.inv-item-avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid var(--blue-light)}
+.inv-item-info{flex:1;min-width:0}
+.inv-item-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inv-item-meta{font-size:12px;color:var(--text-tertiary)}
+.inv-item-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:12px}
+.inv-item-status.complete{background:var(--green-light);color:var(--green)}
+.inv-item-status.error{background:var(--danger-light);color:var(--danger)}
+
+/* ── RISK COLORS ── */
+.risk-critical{color:#d32f2f;font-weight:700}
+.risk-high{color:#e53935;font-weight:700}
+.risk-moderate{color:#ef6c00;font-weight:700}
+.risk-low{color:#f9a825;font-weight:700}
+.risk-minimal{color:#43a047;font-weight:700}
+
+/* ── RESULTS SCROLL ── */
+.results-scroll{max-height:calc(100vh - 140px);overflow-y:auto;padding-right:4px}
+
+/* ── LOADING SPINNER INLINE ── */
+.spinner-inline{display:inline-block;width:18px;height:18px;border:2px solid var(--border-light);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+</style>
+</head>
+<body>
+
+<!-- COMPANY WATERMARK -->
+<div class="company-watermark"><img src="arrephoros-logo.svg" alt="Arrephoros Technologies"></div>
+
+<!-- LOADING -->
+<div id="loadingOverlay">
+  <div style="width:56px;height:56px;margin-bottom:24px">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="50" cy="48" rx="38" ry="42" fill="none" stroke="#1976d2" stroke-width="3"/>
+      <circle cx="36" cy="40" r="7" fill="#1976d2"/>
+      <circle cx="64" cy="40" r="7" fill="#1976d2"/>
+      <circle cx="36" cy="40" r="3" fill="#fff"/>
+      <circle cx="64" cy="40" r="3" fill="#fff"/>
+      <path d="M38 56 Q50 68 62 56" fill="none" stroke="#1976d2" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M12 28 Q25 8 38 22" fill="none" stroke="#1976d2" stroke-width="3" stroke-linecap="round"/>
+      <path d="M88 28 Q75 8 62 22" fill="none" stroke="#1976d2" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="loader-ring"></div>
+</div>
+
+<!-- ═══════════ LOGIN SCREEN ═══════════ -->
+<div class="screen active" id="loginScreen">
+  <div class="card" style="max-width:400px">
+    <div class="text-center">
+      <div class="logo">
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:80px;height:80px;margin:0 auto;display:block">
+          <ellipse cx="50" cy="48" rx="38" ry="42" fill="none" stroke="#1976d2" stroke-width="2.5"/>
+          <circle cx="36" cy="40" r="7" fill="#1976d2"/>
+          <circle cx="64" cy="40" r="7" fill="#1976d2"/>
+          <circle cx="36" cy="40" r="3" fill="#fff"/>
+          <circle cx="64" cy="40" r="3" fill="#fff"/>
+          <path d="M38 56 Q50 68 62 56" fill="none" stroke="#1976d2" stroke-width="2" stroke-linecap="round"/>
+          <path d="M12 28 Q25 8 38 22" fill="none" stroke="#1976d2" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M88 28 Q75 8 62 22" fill="none" stroke="#1976d2" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h1>Artemis</h1>
+      <div class="subtitle">Discord Intelligence Platform</div>
+      <div class="version-tag">Varanus</div>
+    </div>
+    <div style="margin-top:28px">
+      <div class="field"><label>Username</label><input type="text" id="loginUser" placeholder="Enter your username" autocomplete="off"></div>
+      <div class="field"><label>Password</label><input type="password" id="loginPass" placeholder="Enter your password" autocomplete="off"></div>
+      <div class="error-msg" id="loginErr"></div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()">Sign In</button>
+    </div>
+    <p class="text-center mt-16" style="font-size:12px;color:var(--text-tertiary)">Arrephoros Technologies PLC</p>
+  </div>
+</div>
+
+<!-- ═══════════ ADMIN SCREEN ═══════════ -->
+<div class="screen" id="adminScreen">
+  <div class="card card-wide">
+    <div class="flex-row" style="justify-content:space-between;margin-bottom:24px">
+      <div class="flex-row">
+        <div style="width:32px;height:32px">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+            <ellipse cx="50" cy="48" rx="38" ry="42" fill="none" stroke="#1976d2" stroke-width="3"/>
+            <circle cx="36" cy="40" r="7" fill="#1976d2"/>
+            <circle cx="64" cy="40" r="7" fill="#1976d2"/>
+            <circle cx="36" cy="40" r="3" fill="#fff"/>
+            <circle cx="64" cy="40" r="3" fill="#fff"/>
+            <path d="M38 56 Q50 68 62 56" fill="none" stroke="#1976d2" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M12 28 Q25 8 38 22" fill="none" stroke="#1976d2" stroke-width="3" stroke-linecap="round"/>
+            <path d="M88 28 Q75 8 62 22" fill="none" stroke="#1976d2" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2>Administration</h2>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
+    </div>
+
+    <!-- Add User -->
+    <div class="panel-section">
+      <h3 class="mb-12">Add Operative</h3>
+      <div class="flex-row" style="gap:10px;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:140px;margin-bottom:0"><input id="newUser" placeholder="Username"></div>
+        <div class="field" style="flex:1;min-width:140px;margin-bottom:0"><input id="newPass" type="password" placeholder="Password"></div>
+        <button class="btn btn-primary btn-sm" onclick="addUser()">Add</button>
+      </div>
+      <div class="error-msg" id="adminErr"></div>
+    </div>
+
+    <!-- User List -->
+    <div style="max-height:240px;overflow-y:auto">
+      <table class="user-table">
+        <thead><tr><th>Operative</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody id="userTableBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Change Admin Pass -->
+    <div class="panel-section" style="margin-top:16px;margin-bottom:0">
+      <h3 class="mb-12">Change Admin Password</h3>
+      <div class="flex-row" style="gap:10px">
+        <div class="field" style="flex:1;margin-bottom:0"><input id="newAdminPass" type="password" placeholder="New password"></div>
+        <button class="btn btn-danger btn-sm" onclick="changeAdminPass()">Update</button>
+      </div>
+      <div class="error-msg" id="adminPassErr"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ DASHBOARD SCREEN ═══════════ -->
+<div class="screen" id="dashScreen">
+  <div class="card card-wide">
+    <div class="flex-row" style="justify-content:space-between;margin-bottom:20px">
+      <div class="flex-row">
+        <div style="width:32px;height:32px">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+            <ellipse cx="50" cy="48" rx="38" ry="42" fill="none" stroke="#1976d2" stroke-width="3"/>
+            <circle cx="36" cy="40" r="7" fill="#1976d2"/>
+            <circle cx="64" cy="40" r="7" fill="#1976d2"/>
+            <circle cx="36" cy="40" r="3" fill="#fff"/>
+            <circle cx="64" cy="40" r="3" fill="#fff"/>
+            <path d="M38 56 Q50 68 62 56" fill="none" stroke="#1976d2" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M12 28 Q25 8 38 22" fill="none" stroke="#1976d2" stroke-width="3" stroke-linecap="round"/>
+            <path d="M88 28 Q75 8 62 22" fill="none" stroke="#1976d2" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2>Artemis</h2>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Sign Out</button>
+    </div>
+
+    <!-- Search -->
+    <div class="search-container">
+      <input type="text" id="searchUID" placeholder="Enter Discord User ID" autocomplete="off">
+      <button class="btn btn-primary btn-sm" id="searchBtn" onclick="doLookup()">Investigate</button>
+    </div>
+    <div class="error-msg" id="searchErr"></div>
+
+    <!-- Investigation Loading -->
+    <div id="searchLoading" style="display:none;text-align:center;padding:32px">
+      <div class="spinner-inline" style="width:28px;height:28px;border-width:3px"></div>
+      <span style="font-size:14px;color:var(--text-secondary);font-weight:500">Investigating...</span>
+    </div>
+
+    <!-- Recent Investigations -->
+    <div class="mt-16">
+      <div class="caption mb-8">Recent Investigations</div>
+      <div id="invList" style="max-height:320px;overflow-y:auto">
+        <div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:14px">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ RESULTS SCREEN ═══════════ -->
+<div class="screen" id="resultScreen">
+  <div class="card card-xl results-scroll" id="resultPanel">
+    <div class="flex-row" style="justify-content:space-between;margin-bottom:20px">
+      <div class="flex-row">
+        <div style="width:32px;height:32px">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%">
+            <ellipse cx="50" cy="48" rx="38" ry="42" fill="none" stroke="#1976d2" stroke-width="3"/>
+            <circle cx="36" cy="40" r="7" fill="#1976d2"/>
+            <circle cx="64" cy="40" r="7" fill="#1976d2"/>
+            <circle cx="36" cy="40" r="3" fill="#fff"/>
+            <circle cx="64" cy="40" r="3" fill="#fff"/>
+            <path d="M38 56 Q50 68 62 56" fill="none" stroke="#1976d2" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M12 28 Q25 8 38 22" fill="none" stroke="#1976d2" stroke-width="3" stroke-linecap="round"/>
+            <path d="M88 28 Q75 8 62 22" fill="none" stroke="#1976d2" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <h2>Intelligence Report</h2>
+      </div>
+      <div class="flex-row" style="gap:6px">
+        <button class="btn btn-secondary btn-sm" onclick="exportReport()">Export Report</button>
+        <button class="btn btn-primary btn-sm" onclick="newInvestigation()">New Investigation</button>
+      </div>
+    </div>
+
+    <div id="resultContent"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  ARTEMIS — DISCORD INTELLIGENCE PLATFORM
+//  Version One: Varanus
+// ═══════════════════════════════════════
+
+// ╔═══════════════════════════════════════════════════════════╗
+// ║  PASTE YOUR APPS SCRIPT DEPLOYMENT URL BELOW             ║
+// ╚═══════════════════════════════════════════════════════════╝
+const API_URL = 'https://script.google.com/macros/s/AKfycbxpjvMtWYE0ufYRe-i2SmkW2QrhnHtc3EapE3RYWOXrQXZKkMtXk_WHfUInO45ah3_Q/exec';
+
+const TOKEN_KEY = 'artemis_session_token';
+
+let currentUser = null;
+let currentRole = null;
+let currentResult = null;
+
+// ── API HELPER ──
+async function api(action, params = {}) {
+  const body = Object.assign({ action }, params);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) body.token = token;
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+// ── BUTTON LOADING STATES ──
+function btnLoading(btn, loading) {
+  if (loading) {
+    btn.dataset.origText = btn.textContent;
+    btn.textContent = 'Processing...';
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+  } else {
+    btn.textContent = btn.dataset.origText || btn.textContent;
+    btn.disabled = false;
+    btn.style.opacity = '1';
+  }
+}
+
+// ── HTML ESCAPE ──
+function esc(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
+}
+
+// ── SCREEN NAV ──
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── INIT ──
+async function init() {
+  document.getElementById('loginUser').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('searchUID').addEventListener('keydown', e => { if (e.key === 'Enter') doLookup(); });
+
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    try {
+      const res = await api('validate', { token });
+      if (res.ok) {
+        currentUser = res.username;
+        currentRole = res.role;
+        if (res.role === 'admin') { showScreen('adminScreen'); refreshUserTable(); }
+        else { showScreen('dashScreen'); refreshInvestigations(); }
+      } else {
+        localStorage.removeItem(TOKEN_KEY);
+      }
+    } catch (e) {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+  }
+
+  setTimeout(() => { document.getElementById('loadingOverlay').classList.add('fade-out'); }, 600);
+}
+
+// ═══════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════
+
+async function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginErr');
+  err.textContent = '';
+  if (!u || !p) { err.textContent = 'All fields required.'; return; }
+
+  const btn = document.querySelector('#loginScreen .btn-primary');
+  btnLoading(btn, true);
+
+  try {
+    const res = await api('login', { username: u, password: p });
+    if (res.ok) {
+      localStorage.setItem(TOKEN_KEY, res.token);
+      currentUser = u;
+      currentRole = res.role;
+      if (res.role === 'admin') { showScreen('adminScreen'); refreshUserTable(); }
+      else { showScreen('dashScreen'); refreshInvestigations(); }
+    } else {
+      err.textContent = res.error || 'Invalid credentials.';
+    }
+  } catch (e) {
+    err.textContent = 'Unable to reach server.';
+  } finally {
+    btnLoading(btn, false);
+  }
+}
+
+async function doLogout() {
+  const btn = event ? event.target : null;
+  if (btn) btnLoading(btn, true);
+
+  try { await api('logout'); } catch (e) {}
+
+  localStorage.removeItem(TOKEN_KEY);
+  currentUser = null;
+  currentRole = null;
+  currentResult = null;
+  showScreen('loginScreen');
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginErr').textContent = '';
+  if (btn) btnLoading(btn, false);
+}
+
+// ═══════════════════════════════════════
+//  ADMIN
+// ═══════════════════════════════════════
+
+async function addUser() {
+  const u = document.getElementById('newUser').value.trim();
+  const p = document.getElementById('newPass').value;
+  const err = document.getElementById('adminErr');
+  err.textContent = '';
+  if (!u || !p) { err.textContent = 'Username and password required.'; return; }
+
+  const btn = document.querySelector('#adminScreen .btn-primary');
+  btnLoading(btn, true);
+
+  try {
+    const res = await api('adduser', { username: u, password: p });
+    if (res.ok) {
+      document.getElementById('newUser').value = '';
+      document.getElementById('newPass').value = '';
+      refreshUserTable();
+    } else {
+      err.textContent = res.error || 'Failed to add user.';
+    }
+  } catch (e) {
+    err.textContent = 'Unable to reach server.';
+  } finally {
+    btnLoading(btn, false);
+  }
+}
+
+async function removeUser(username) {
+  try {
+    const res = await api('removeuser', { username });
+    if (!res.ok) alert(res.error || 'Failed to remove user.');
+    refreshUserTable();
+  } catch (e) {
+    alert('Unable to reach server.');
+  }
+}
+
+async function changeAdminPass() {
+  const p = document.getElementById('newAdminPass').value;
+  const err = document.getElementById('adminPassErr');
+  err.textContent = '';
+  err.style.color = '';
+  if (!p || p.length < 4) { err.textContent = 'Password must be at least 4 characters.'; return; }
+
+  const btn = document.querySelector('#adminScreen .btn-danger');
+  btnLoading(btn, true);
+
+  try {
+    const res = await api('changeadminpass', { newPassword: p });
+    if (res.ok) {
+      document.getElementById('newAdminPass').value = '';
+      err.style.color = 'var(--green)';
+      err.textContent = 'Password updated.';
+      setTimeout(() => { err.textContent = ''; err.style.color = ''; }, 2000);
+    } else {
+      err.textContent = res.error || 'Failed to update password.';
+    }
+  } catch (e) {
+    err.textContent = 'Unable to reach server.';
+  } finally {
+    btnLoading(btn, false);
+  }
+}
+
+async function refreshUserTable() {
+  const tbody = document.getElementById('userTableBody');
+  tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-tertiary);text-align:center;padding:20px">Loading...</td></tr>';
+
+  try {
+    const res = await api('listusers');
+    tbody.innerHTML = '';
+    if (!res.ok) { tbody.innerHTML = '<tr><td colspan="3" style="color:var(--danger);text-align:center">' + esc(res.error || 'Error') + '</td></tr>'; return; }
+    const users = res.users.filter(u => u.role !== 'admin');
+    if (!users.length) { tbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-tertiary);text-align:center;padding:20px">No operatives registered</td></tr>'; return; }
+    users.forEach(u => {
+      const tr = document.createElement('tr');
+      const safeName = esc(u.username);
+      tr.innerHTML = '<td>' + safeName + '</td><td><span class="badge badge-active">Active</span></td><td><button class="btn btn-danger btn-sm" onclick="removeUser(\'' + safeName.replace(/'/g, "\\'") + '\')">Remove</button></td>';
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="3" style="color:var(--danger);text-align:center">Connection error</td></tr>';
+  }
+}
+
+// ═══════════════════════════════════════
+//  INVESTIGATION
+// ═══════════════════════════════════════
+
+async function doLookup() {
+  const uid = document.getElementById('searchUID').value.trim();
+  const err = document.getElementById('searchErr');
+  err.textContent = '';
+
+  if (!/^\d{17,20}$/.test(uid)) {
+    err.textContent = 'Enter a valid Discord User ID (17-20 digits).';
+    return;
+  }
+
+  const btn = document.getElementById('searchBtn');
+  const loading = document.getElementById('searchLoading');
+  btnLoading(btn, true);
+  loading.style.display = 'block';
+
+  try {
+    const res = await api('lookup', { uid });
+    if (res.ok) {
+      currentResult = res.result;
+      renderResult(res.result);
+      showScreen('resultScreen');
+    } else {
+      err.textContent = res.error || 'Investigation failed.';
+    }
+  } catch (e) {
+    err.textContent = 'Unable to reach server.';
+  } finally {
+    btnLoading(btn, false);
+    loading.style.display = 'none';
+  }
+}
+
+async function refreshInvestigations() {
+  const list = document.getElementById('invList');
+  list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:14px">Loading...</div>';
+
+  try {
+    const res = await api('listinvestigations');
+    list.innerHTML = '';
+    if (!res.ok) { list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--danger);font-size:14px">' + esc(res.error || 'Error') + '</div>'; return; }
+    if (!res.investigations || !res.investigations.length) {
+      list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:14px">No investigations yet. Enter a Discord User ID above to begin.</div>';
+      return;
+    }
+    res.investigations.forEach(inv => {
+      const div = document.createElement('div');
+      div.className = 'inv-item';
+      div.onclick = () => loadInvestigation(inv.investigationId);
+      const avatarSrc = inv.avatarURL || 'https://cdn.discordapp.com/embed/avatars/0.png';
+      const ts = inv.investigatedAt ? new Date(inv.investigatedAt).toLocaleString() : '';
+      div.innerHTML = `
+        <img class="inv-item-avatar" src="${esc(avatarSrc)}" alt="" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+        <div class="inv-item-info">
+          <div class="inv-item-name">${esc(inv.username || inv.displayName || 'Unknown')}</div>
+          <div class="inv-item-meta">${esc(inv.uid)} &middot; ${esc(ts)} &middot; by ${esc(inv.investigator)}</div>
+        </div>
+        <span class="inv-item-status ${inv.status === 'complete' ? 'complete' : 'error'}">${esc(inv.status)}</span>
+      `;
+      list.appendChild(div);
+    });
+  } catch (e) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--danger);font-size:14px">Connection error</div>';
+  }
+}
+
+async function loadInvestigation(id) {
+  try {
+    const res = await api('getinvestigation', { investigationId: id });
+    if (res.ok && res.investigation && res.investigation.result) {
+      currentResult = res.investigation.result;
+      renderResult(res.investigation.result);
+      showScreen('resultScreen');
+    } else {
+      alert(res.error || 'Could not load investigation.');
+    }
+  } catch (e) {
+    alert('Unable to reach server.');
+  }
+}
+
+function newInvestigation() {
+  currentResult = null;
+  document.getElementById('searchUID').value = '';
+  document.getElementById('searchErr').textContent = '';
+  showScreen('dashScreen');
+  refreshInvestigations();
+}
+
+// ═══════════════════════════════════════
+//  RENDER RESULT
+// ═══════════════════════════════════════
+
+function renderResult(r) {
+  const c = document.getElementById('resultContent');
+
+  // Badges HTML
+  let badgesHtml = '';
+  if (r.badges && r.badges.length) {
+    badgesHtml = r.badges.map(b => `<span class="badge-discord">${esc(b)}</span>`).join('');
+  } else {
+    badgesHtml = '<span style="color:var(--text-tertiary);font-size:13px">None</span>';
+  }
+
+  // Risk class
+  const riskClass = r.accountAge ? 'risk-' + r.accountAge.risk.toLowerCase() : '';
+
+  // Account age text
+  const ageDays = r.accountAge ? r.accountAge.ageDays : 0;
+  const ageYears = Math.floor(ageDays / 365);
+  const ageRemDays = ageDays % 365;
+  const ageText = ageYears > 0 ? ageYears + 'y ' + ageRemDays + 'd' : ageDays + ' days';
+
+  // Created date
+  const createdDate = r.accountAge ? new Date(r.accountAge.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown';
+
+  // Cross-platform table rows
+  let xplatRows = '';
+  if (r.crossPlatform && r.crossPlatform.length) {
+    r.crossPlatform.forEach(p => {
+      const statusClass = p.status === 'Found' ? 'xplat-found' : p.status === 'Possible' ? 'xplat-possible' : p.status === 'Error' ? 'xplat-error' : 'xplat-notfound';
+      const link = p.url ? `<a href="${esc(p.url)}" target="_blank" class="xplat-link">${esc(p.username)}</a>` : esc(p.username);
+      xplatRows += `<tr>
+        <td>${esc(p.platform)}</td>
+        <td>${link}</td>
+        <td class="${statusClass}">${esc(p.status)}</td>
+        <td>${esc(p.confidence)}</td>
+      </tr>`;
+    });
+  }
+
+  const avatarURL = r.avatarURL || 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+  c.innerHTML = `
+    <!-- Profile Hero -->
+    <div class="profile-hero animate-in">
+      <img class="profile-avatar" src="${esc(avatarURL)}" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+      <div class="profile-username">${esc(r.username)}</div>
+      <div class="profile-displayname">${esc(r.displayName)}</div>
+      <div class="profile-uid">${esc(r.uid)}</div>
+      <div class="mt-8">${badgesHtml}</div>
+    </div>
+
+    <!-- Account Intelligence -->
+    <div class="intel-section animate-in">
+      <h3>Account Intelligence</h3>
+      <div class="intel-row"><span class="label">Created</span><span class="value">${esc(createdDate)}</span></div>
+      <div class="intel-row"><span class="label">Account Age</span><span class="value">${esc(ageText)}</span></div>
+      <div class="intel-row"><span class="label">Age Risk</span><span class="value ${riskClass}">${esc(r.accountAge ? r.accountAge.risk : 'Unknown')}</span></div>
+      <div class="intel-row"><span class="label">Nitro (Inferred)</span><span class="value">${r.avatar && r.avatar.nitroInferred ? 'Likely' : 'Not detected'}</span></div>
+      <div class="intel-row"><span class="label">Animated Avatar</span><span class="value">${r.avatar && r.avatar.isAnimated ? 'Yes' : 'No'}</span></div>
+      <div class="intel-row"><span class="label">Custom Avatar</span><span class="value">${r.avatar && r.avatar.hasCustomAvatar ? 'Yes' : 'Default'}</span></div>
+      <div class="intel-row"><span class="label">Custom Banner</span><span class="value">${r.avatar && r.avatar.hasCustomBanner ? 'Yes' : 'No'}</span></div>
+      <div class="intel-row"><span class="label">Bot Account</span><span class="value">${r.isBot ? '<span style="color:var(--danger);font-weight:700">Yes</span>' : 'No'}</span></div>
+      <div class="intel-row"><span class="label">System Account</span><span class="value">${r.isSystem ? 'Yes' : 'No'}</span></div>
+      <div class="intel-row"><span class="label">Public Flags</span><span class="value" style="font-family:monospace">${r.flags || 0}</span></div>
+    </div>
+
+    <!-- Cross-Platform Intelligence -->
+    <div class="intel-section animate-in">
+      <h3>Cross-Platform Intelligence</h3>
+      <table class="xplat-table">
+        <thead><tr><th>Platform</th><th>Username</th><th>Status</th><th>Confidence</th></tr></thead>
+        <tbody>${xplatRows || '<tr><td colspan="4" style="text-align:center;color:var(--text-tertiary)">No cross-platform data</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <!-- Investigation Metadata -->
+    <div class="intel-section animate-in">
+      <h3>Investigation Metadata</h3>
+      <div class="intel-row"><span class="label">Investigation ID</span><span class="value" style="font-family:monospace;font-size:12px">${esc(r.investigationId)}</span></div>
+      <div class="intel-row"><span class="label">Investigator</span><span class="value">${esc(r.investigator)}</span></div>
+      <div class="intel-row"><span class="label">Investigated At</span><span class="value">${r.investigatedAt ? new Date(r.investigatedAt).toLocaleString() : 'Unknown'}</span></div>
+      <div class="intel-row"><span class="label">Target UID</span><span class="value" style="font-family:monospace">${esc(r.uid)}</span></div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════
+//  EXPORT
+// ═══════════════════════════════════════
+
+function exportReport() {
+  if (!currentResult) return;
+  const r = currentResult;
+
+  const printWin = window.open('', '_blank');
+  if (!printWin) { alert('Pop-up blocked. Please allow pop-ups for this site.'); return; }
+
+  const badgesText = r.badges && r.badges.length ? r.badges.join(', ') : 'None';
+  const ageDays = r.accountAge ? r.accountAge.ageDays : 0;
+  const createdDate = r.accountAge ? new Date(r.accountAge.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown';
+
+  let xplatHtml = '';
+  if (r.crossPlatform && r.crossPlatform.length) {
+    xplatHtml = '<table style="width:100%;border-collapse:collapse;margin:8px 0"><thead><tr><th style="text-align:left;padding:6px;border-bottom:2px solid #1976d2;font-size:12px">Platform</th><th style="text-align:left;padding:6px;border-bottom:2px solid #1976d2;font-size:12px">Username</th><th style="text-align:left;padding:6px;border-bottom:2px solid #1976d2;font-size:12px">Status</th><th style="text-align:left;padding:6px;border-bottom:2px solid #1976d2;font-size:12px">Confidence</th></tr></thead><tbody>';
+    r.crossPlatform.forEach(p => {
+      xplatHtml += `<tr><td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:13px">${esc(p.platform)}</td><td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:13px">${esc(p.username)}</td><td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:13px;font-weight:600">${esc(p.status)}</td><td style="padding:4px 6px;border-bottom:1px solid #eee;font-size:13px">${esc(p.confidence)}</td></tr>`;
+    });
+    xplatHtml += '</tbody></table>';
+  }
+
+  printWin.document.write(`<!DOCTYPE html><html><head><title>Artemis Report — ${esc(r.username)}</title><style>
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:700px;margin:40px auto;color:#1d1d1f;font-size:14px;line-height:1.6}
+    h1{font-size:22px;color:#1976d2;margin-bottom:4px}
+    h2{font-size:16px;color:#1976d2;margin:20px 0 8px;border-bottom:1px solid #e3f2fd;padding-bottom:4px}
+    .row{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0}
+    .row .l{color:#6e6e73}.row .v{font-weight:600}
+    .meta{font-size:12px;color:#86868b;margin-top:24px;border-top:1px solid #e8e8ed;padding-top:12px}
+  </style></head><body>
+    <h1>Artemis Intelligence Report</h1>
+    <p style="color:#6e6e73;margin-bottom:20px">Arrephoros Technologies PLC &middot; Generated ${new Date().toLocaleString()}</p>
+    <div style="text-align:center;margin:20px 0"><img src="${esc(r.avatarURL || '')}" style="width:80px;height:80px;border-radius:50%;border:3px solid #1976d2" onerror="this.style.display='none'"></div>
+    <div style="text-align:center"><strong style="font-size:18px">${esc(r.username)}</strong><br><span style="color:#6e6e73">${esc(r.displayName)}</span><br><code style="font-size:12px;color:#86868b">${esc(r.uid)}</code></div>
+    <h2>Account Intelligence</h2>
+    <div class="row"><span class="l">Created</span><span class="v">${esc(createdDate)}</span></div>
+    <div class="row"><span class="l">Account Age</span><span class="v">${ageDays} days</span></div>
+    <div class="row"><span class="l">Age Risk</span><span class="v" style="color:${r.accountAge ? r.accountAge.color : '#000'}">${esc(r.accountAge ? r.accountAge.risk : 'Unknown')}</span></div>
+    <div class="row"><span class="l">Badges</span><span class="v">${esc(badgesText)}</span></div>
+    <div class="row"><span class="l">Bot Account</span><span class="v">${r.isBot ? 'Yes' : 'No'}</span></div>
+    <div class="row"><span class="l">Nitro (Inferred)</span><span class="v">${r.avatar && r.avatar.nitroInferred ? 'Likely' : 'Not detected'}</span></div>
+    <div class="row"><span class="l">Public Flags</span><span class="v">${r.flags || 0}</span></div>
+    <h2>Cross-Platform Intelligence</h2>
+    ${xplatHtml || '<p style="color:#86868b">No cross-platform data available.</p>'}
+    <div class="meta">
+      <div class="row"><span class="l">Investigation ID</span><span class="v">${esc(r.investigationId)}</span></div>
+      <div class="row"><span class="l">Investigator</span><span class="v">${esc(r.investigator)}</span></div>
+      <div class="row"><span class="l">Investigated At</span><span class="v">${r.investigatedAt ? new Date(r.investigatedAt).toLocaleString() : ''}</span></div>
+    </div>
+  </body></html>`);
+  printWin.document.close();
+  printWin.print();
+}
+
+// ── BOOT ──
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
