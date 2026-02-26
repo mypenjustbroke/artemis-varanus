@@ -331,6 +331,10 @@ h3{font-size:15px;font-weight:600;color:var(--text)}
       <input type="text" id="searchUID" placeholder="Enter Discord User ID" autocomplete="off">
       <button class="btn btn-primary btn-sm" id="searchBtn" onclick="doLookup()">Investigate</button>
     </div>
+    <div style="display:flex;gap:8px;margin-top:-8px;margin-bottom:12px">
+      <input type="email" id="searchEmail" placeholder="Email (optional)" autocomplete="off" style="flex:1;background:var(--bg-secondary);border:1px solid var(--border-light);color:var(--text);padding:8px 12px;font-family:var(--font);font-size:13px;border-radius:var(--radius-sm);outline:none">
+      <input type="text" id="searchAltUser" placeholder="Alt username (optional)" autocomplete="off" style="flex:1;background:var(--bg-secondary);border:1px solid var(--border-light);color:var(--text);padding:8px 12px;font-family:var(--font);font-size:13px;border-radius:var(--radius-sm);outline:none">
+    </div>
     <div class="error-msg" id="searchErr"></div>
 
     <!-- Investigation Loading -->
@@ -591,6 +595,8 @@ async function refreshUserTable() {
 
 async function doLookup() {
   const uid = document.getElementById('searchUID').value.trim();
+  const email = document.getElementById('searchEmail').value.trim();
+  const altUsername = document.getElementById('searchAltUser').value.trim();
   const err = document.getElementById('searchErr');
   err.textContent = '';
 
@@ -605,7 +611,10 @@ async function doLookup() {
   loading.style.display = 'block';
 
   try {
-    const res = await api('lookup', { uid });
+    const params = { uid };
+    if (email) params.email = email;
+    if (altUsername) params.altUsername = altUsername;
+    const res = await api('lookup', params);
     if (res.ok) {
       currentResult = res.result;
       renderResult(res.result);
@@ -672,6 +681,8 @@ async function loadInvestigation(id) {
 function newInvestigation() {
   currentResult = null;
   document.getElementById('searchUID').value = '';
+  document.getElementById('searchEmail').value = '';
+  document.getElementById('searchAltUser').value = '';
   document.getElementById('searchErr').textContent = '';
   showScreen('dashScreen');
   refreshInvestigations();
@@ -706,7 +717,7 @@ function toggleSection(el) {
 function renderResult(r) {
   const c = document.getElementById('resultContent');
   const a = r.analysis || {};
-  const osint = r.osint || { keybase: null, codeSearch: { repoMentions: [], userMatches: [] }, emailIntel: { candidates: [], gravatarMatches: [] }, domains: { resolved: [], checked: [] }, wayback: { avatarHistory: [], usernameHistory: [] }, discordProfile: { bio: null, pronouns: null, topgg: null } };
+  const osint = r.osint || { keybase: null, codeSearch: { repoMentions: [], userMatches: [] }, emailIntel: { candidates: [], gravatarMatches: [] }, domains: { resolved: [], checked: [] }, wayback: { avatarHistory: [], usernameHistory: [] }, discordProfile: { bio: null, pronouns: null, topgg: null }, discoveredEmails: [], discoveredPhones: [], altUsernamePlatforms: [], altUsernameSearched: '' };
 
   // Badges HTML
   let badgesHtml = '';
@@ -901,6 +912,31 @@ function renderResult(r) {
 
     <!-- Alerts -->
     ${alertsHtml}
+
+    <!-- Discovered Emails & Phones -->
+    ${osint.discoveredEmails && osint.discoveredEmails.length ? `<div class="alert-banner alert-info" style="flex-direction:column;align-items:flex-start;gap:6px">
+      <strong>Discovered Email(s):</strong>
+      ${osint.discoveredEmails.map(e => `<div style="display:flex;align-items:center;gap:8px"><span style="font-family:monospace;font-size:13px">${esc(e.email)}</span><span class="tag tag-blue">${esc(e.source)}</span>${e.gravatarMatch ? '<span class="tag tag-green">Gravatar</span>' : ''}</div>`).join('')}
+    </div>` : ''}
+    ${osint.discoveredPhones && osint.discoveredPhones.length ? `<div class="alert-banner alert-info" style="flex-direction:column;align-items:flex-start;gap:6px">
+      <strong>Discovered Phone(s):</strong>
+      ${osint.discoveredPhones.map(p => `<div style="display:flex;align-items:center;gap:8px"><span style="font-family:monospace;font-size:13px">${esc(p.phone)}</span><span class="tag tag-blue">${esc(p.source)}</span></div>`).join('')}
+    </div>` : ''}
+
+    <!-- Alt Username Results -->
+    ${osint.altUsernamePlatforms && osint.altUsernamePlatforms.length ? `<div class="analysis-section animate-in">
+      <div class="analysis-header open" onclick="toggleSection(this)"><h3>Alt Username Intelligence <span class="tag tag-blue" style="margin-left:8px">${esc(osint.altUsernameSearched || '')}</span></h3><span class="toggle-icon">&#9660;</span></div>
+      <div class="analysis-body open">
+        <table class="xplat-table">
+          <thead><tr><th>Platform</th><th>Username</th><th>Status</th><th>Confidence</th></tr></thead>
+          <tbody>${osint.altUsernamePlatforms.filter(p => p.status === 'Found' || p.status === 'Possible').map(p => {
+            const sc = p.status === 'Found' ? 'xplat-found' : 'xplat-possible';
+            const lnk = p.url ? '<a href="'+esc(p.url)+'" target="_blank" class="xplat-link">'+esc(p.username)+'</a>' : esc(p.username);
+            return '<tr><td>'+esc(p.platform)+'</td><td>'+lnk+'</td><td class="'+sc+'">'+esc(p.status)+'</td><td>'+esc(p.confidence)+'</td></tr>';
+          }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-tertiary)">No matches found for alt username</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>` : ''}
 
     <!-- Account Intelligence -->
     <div class="intel-section animate-in">
